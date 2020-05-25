@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+
+	<head>
+		<title>仓库布局</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	</head>
+
+	<body>
+
+		<script src="js/jquery-1.9.1.js"></script>
+		<script src="js/three.js"></script>
+		<script src="js/OrbitControls.js"></script>
+		<script src="js/ThreeBSP.js"></script>
+		<script src="js/Detector.js"></script>
+		<script src="js/MTLLoader.js"></script>
+		<script src="js/OBJLoader.js"></script>
+		<script src="js/onEvent.js"></script>
+
+
+		<div id="ThreeJS" style="position: absolute; left: 0px; top: 0px"></div>
+		<video id="sxt1" loop crossOrigin="anonymous" playsinline style="display:none">
+			<source src="./video/5.mp4" type='video/mp4; codecs="avc1.42E01E, mp4a.40.2"'>
+		</video>
+		<video id="sxt2" loop crossOrigin="anonymous" playsinline style="display:none">
+			<source src="./video/5.mp4" type='video/mp4; codecs="avc1.42E01E, mp4a.40.2"'>
+		</video>
+		<video id="sxt3" loop crossOrigin="anonymous" playsinline style="display:none">
+			<source src="./video/5.mp4" type='video/mp4; codecs="avc1.42E01E, mp4a.40.2"'>
+		</video>
+		<video id="sxt4" loop crossOrigin="anonymous" playsinline style="display:none">
+			<source src="./video/5.mp4" type='video/mp4; codecs="avc1.42E01E, mp4a.40.2"'>
+		</video>
+
+		<script>
+			
+			// 设置全局变量
+			var door_state = false; //默认是门是关闭的
+			var cabinets = {};
+			var dummy = new THREE.Object3D();
+			var dummys = {};
+			var videoScreen = null;
+			var video_click = {}
+			var video_start_name = "";
+			//事件相关
+			var threeOnEvent;
+			var scene, camera, renderer, controls, door;
+			var SCREEN_WIDTH = window.innerWidth,
+				SCREEN_HEIGHT = window.innerHeight;
+			var VIEW_ANGLE = 75,
+				ASPECT = SCREEN_WIDTH / SCREEN_HEIGHT,
+				NEAR = 1,
+				FAR = 20000;
+			var materialArrayA = [];
+			var materialArrayB = [];
+			var matArrayA = [];
+			var matArrayB = [];
+			init();
+			animate();
+
+			// 场景
+			function initScene() {
+				scene = new THREE.Scene();
+			}
+
+			// 相机
+			function initCamera() {
+				
+				camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR);
+				camera.position.set(0, 1000, 1500);
+				camera.lookAt(scene.position);
+				camera.lookAt(0, 0, 0);
+				scene.add(camera);
+			}
+
+			// 事件
+			function initEvent() {
+				threeOnEvent = new THREE.onEvent(scene, camera);
+			}
+
+			// 渲染器
+			function initRender() {
+				if(Detector.webgl) {
+					renderer = new THREE.WebGLRenderer({
+						antialias: true,
+						alpha: true
+					});
+				} else {
+					renderer = new THREE.CanvasRenderer();
+				}
+				renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+				container = document.getElementById('ThreeJS');
+				container.appendChild(renderer.domElement);
+				renderer.setClearColor(0xEEEEEE, 0.0);
+				//更新事件
+				threeOnEvent.update();
+			}
+
+			// 控制
+			function initControls() {
+				controls = new THREE.OrbitControls(camera, renderer.domElement);
+			}
+
+			// 光源
+			function initLight() {
+				var directionalLight = new THREE.DirectionalLight(0xffffff, 1); //模拟远处类似太阳的光源
+				directionalLight.position.set(0, 100, 0).normalize();
+				scene.add(directionalLight);
+				
+				var ambient = new THREE.AmbientLight(0xffffff, 1); //AmbientLight,影响整个场景的光源
+				ambient.position.set(0, 0, 0);
+				scene.add(ambient);
+			}
+
+			// 创建地板  
+			function createFloor() {
+				var loader = new THREE.TextureLoader();
+				loader.load("images/floor.jpg", function(texture) {
+					texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+					texture.repeat.set(10, 10);
+					var floorGeometry = new THREE.BoxGeometry(1600, 1100, 1);
+					var floorMaterial = new THREE.MeshBasicMaterial({
+						map: texture,
+						side: THREE.DoubleSide
+					});
+					var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+					floor.position.y = -0.5;
+					floor.rotation.x = Math.PI / 2;
+					scene.add(floor);
+				});
+
+				weiqiang()
+			}
+
+			// 创建两侧围墙
+			function weiqiang() {
+
+				//两侧围墙
+				//茶色：0x58ACFA   透明玻璃色：0XECF1F3
+				var glass_material = new THREE.MeshBasicMaterial({
+					color: 0x58ACFA
+				});
+				glass_material.opacity = 0.4;
+				glass_material.transparent = true;
+
+				var left_wall = returnWallObject(20, 200, 1100, 0, matArrayB, -801, 100, 0);
+				var left_cube = returnWallObject(20, 110, 1100, 0, matArrayB, -801, 100, 0);
+				createResultBsp(left_wall, left_cube, 1);
+				createCubeWall(1, 110, 1100, 0, glass_material, -801, 100, 0);
+
+				var right_wall = returnWallObject(20, 200, 1100, 1, matArrayB, 801, 100, 0);
+				var right_cube = returnWallObject(20, 110, 1100, 0, matArrayB, 801, 100, 0);
+				createResultBsp(right_wall, right_cube, 1);
+				createCubeWall(1, 110, 1100, 0, glass_material, 801, 100, 0);
+			}
+
+			// 墙上挖门，通过两个几何体生成BSP对象
+			function createResultBsp(bsp, less_bsp, mat) {
+				switch(mat) {
+					case 1:
+						var material = new THREE.MeshPhongMaterial({
+							color: 0x9cb2d1,
+							specular: 0x9cb2d1,
+							shininess: 30,
+							transparent: true,
+							opacity: 1
+						});
+						break;
+					case 2:
+						var material = new THREE.MeshPhongMaterial({
+							color: 0xafc0ca,
+							specular: 0xafc0ca,
+							shininess: 30,
+							transparent: true,
+							opacity: 1
+						});
+						break;
+					default:
+				}
+
+				var sphere1BSP = new ThreeBSP(bsp);
+				var cube2BSP = new ThreeBSP(less_bsp); //0x9cb2d1 淡紫,0xC3C3C3 白灰 , 0xafc0ca灰
+				var resultBSP = sphere1BSP.subtract(cube2BSP);
+				var result = resultBSP.toMesh(material);
+				result.material.flatshading = THREE.FlatShading;
+				result.geometry.computeFaceNormals(); //重新计算几何体侧面法向量
+				result.geometry.computeVertexNormals();
+				result.material.needsUpdate = true; //更新纹理
+				result.geometry.buffersNeedUpdate = true;
+				result.geometry.uvsNeedUpdate = true;
+				scene.add(result);
+			}
+
+			// 创建墙并返回墙
+			function createCubeWall(width, height, depth, angle, material, x, y, z) {
+				var cubeGeometry = new THREE.BoxGeometry(width, height, depth);
+				var cube = new THREE.Mesh(cubeGeometry, material);
+
+				cube.position.x = x;
+				cube.position.y = y;
+				cube.position.z = z;
+				cube.rotation.y += angle * Math.PI;
+
+				scene.add(cube);
+				return cube;
+			}
+			
+			// 创建地板
+			function createFloor() {
+				var loader = new THREE.TextureLoader();
+				loader.load("images/floor.jpg", function(texture) {
+					texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+					texture.repeat.set(10, 10);
+					var floorGeometry = new THREE.BoxGeometry(1600, 1100, 1);
+					var floorMaterial = new THREE.MeshBasicMaterial({
+						map: texture,
+						side: THREE.DoubleSide
+					});
+					var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+					floor.position.y = -0.5;
+					floor.rotation.x = Math.PI / 2;
+					scene.add(floor);
+				});
+
+				weiqiang()
+			}
+
+			//返回墙对象
+			function returnWallObject(width, height, depth, angle, material, x, y, z) {
+				var cubeGeometry = new THREE.BoxGeometry(width, height, depth);
+				var cube = new THREE.Mesh(cubeGeometry, material);
+				cube.position.x = x;
+				cube.position.y = y;
+				cube.position.z = z;
+				cube.rotation.y += angle * Math.PI;
+				return cube;
+			}
+
+			// 创建纹理
+			function createWallMaterail() {
+				matArrayA.push(new THREE.MeshPhongMaterial({
+					color: "#878787"
+				})); //前  0xafc0ca :灰色
+				matArrayA.push(new THREE.MeshPhongMaterial({
+					color: "#878787"
+				})); //后  
+				matArrayA.push(new THREE.MeshPhongMaterial({
+					color: "#626262"
+				})); //上  0xd6e4ec： 偏白色
+				matArrayA.push(new THREE.MeshPhongMaterial({
+					color: "#626262"
+				})); //下  
+				matArrayA.push(new THREE.MeshPhongMaterial({
+					color: "#878787"
+				})); //左    0xafc0ca :灰色
+				matArrayA.push(new THREE.MeshPhongMaterial({
+					color: "#878787"
+				})); //右
+
+				matArrayB.push(new THREE.MeshPhongMaterial({
+					color: 0xafc0ca
+				})); //前  0xafc0ca :灰色
+				matArrayB.push(new THREE.MeshPhongMaterial({
+					color: 0x9cb2d1
+				})); //后  0x9cb2d1：淡紫
+				matArrayB.push(new THREE.MeshPhongMaterial({
+					color: 0xd6e4ec
+				})); //上  0xd6e4ec： 偏白色
+				matArrayB.push(new THREE.MeshPhongMaterial({
+					color: 0xd6e4ec
+				})); //下  
+				matArrayB.push(new THREE.MeshPhongMaterial({
+					color: 0xafc0ca
+				})); //左   0xafc0ca :灰色
+				matArrayB.push(new THREE.MeshPhongMaterial({
+					color: 0xafc0ca
+				})); //右
+
+			}
+
+			// 创建房间布局
+			function createLayout() {
+
+				// 墙面1 立方体比较长的面 
+				createCubeWall(10, 200, 900, 0, matArrayB, -651, 100, 0);
+				// 墙面2  立方体比较长的面
+				createCubeWall(10, 200, 900, 1, matArrayB, 651, 100, 0);
+				// 墙面3 门对面的墙 立方体比较短的面  
+				createCubeWall(10, 200, 1310, 1.5, matArrayB, 0, 100, -451);
+
+				// 墙面4 
+				var wall = returnWallObject(1310, 200, 10, 0, matArrayB, 0, 100, 455);
+				// 门框 
+				var door_cube = returnWallObject(100, 180, 10, 0, matArrayB, 0, 90, 455);
+				createResultBsp(wall, door_cube, 1);
+
+				// 为墙面安装门
+				var loader = new THREE.TextureLoader();
+				loader.load("images/door_right.png", function(texture) {
+					var doorgeometry = new THREE.BoxGeometry(100, 180, 2);
+					var doormaterial = new THREE.MeshBasicMaterial({
+						map: texture,
+						color: 0xffffff
+					});
+					doormaterial.opacity = 1.0;
+					doormaterial.transparent = true;
+					door = new THREE.Mesh(doorgeometry, doormaterial);
+					door.position.set(-50, 0, 0);
+					var door1 = door.clone();
+					door1.position.set(50, 0, 0);
+					door1.visible = false;
+					dummy.add(door);
+					dummy.add(door1);
+					dummy.position.set(50, 90, 451)
+					scene.add(dummy);
+				});
+
+				// 初始化柜子
+				createCubeWall(400, 200, 100, 0, matArrayA, -300, 100, 0);
+				initCabinet("1", -250, 100, 50);
+
+				createCubeWall(400, 200, 100, 0, matArrayA, 300, 100, 0);
+				initCabinet("2", 350, 100, 50);
+
+				createCubeWall(400, 200, 100, 0, matArrayA, 300, 100, -200);
+				initCabinet("3", 350, 100, -150);
+
+				createCubeWall(400, 200, 100, 0, matArrayA, -300, 100, -200);
+				initCabinet("4", -250, 100, -150);
+
+				// 初始化透明屏
+				var cube = returnWallObject(10, 160, 200, 0.5, matArrayA, 10, 92, 300);
+				var door_cube1 = returnWallObject(10, 100, 200, 0.5, matArrayA, 10, 120, 300);
+				createResultBsp(cube, door_cube1, 1);
+				// 茶色：0x58ACFA   透明玻璃色：0XECF1F3
+				var glass_material = new THREE.MeshBasicMaterial({
+					color: 0XECF1F3
+				});
+				glass_material.opacity = 0.6;
+				glass_material.transparent = true;
+				createCubeWall(10, 100, 200, 0.5, glass_material, 10, 120, 300);
+
+				initWebcam("sxt1", './obj/camera.mtl', './obj/camera_left.obj', -605, 150, 400, 0);
+				initWebcam("sxt2", './obj/camera.mtl', './obj/camera_right.obj', 605, 150, 400, 3.14);
+				initWebcam("sxt3", './obj/camera.mtl', './obj/camera_right.obj', -605, 150, -400, 0);
+				initWebcam("sxt4", './obj/camera.mtl', './obj/camera_left.obj', 605, 150, -400, 3.14);
+
+			}
+
+			// 初始化视频
+			function initVideo(videoName) {
+				var video = document.getElementById(videoName);
+				video.play();
+				texture = new THREE.VideoTexture(video);
+				texture.minFilter = THREE.LinearFilter;
+				var parameters = {
+					color: 0xffffff,
+					map: texture
+				};
+				let material = new THREE.MeshLambertMaterial(parameters);
+				var cube = createCubeWall(2, 400, 800, 0.5, material, 0, 550, 0);
+				videoScreen = cube;
+			}
+
+			// 初始化摄像头
+			function initWebcam(name, mtl, obj, x, y, z, r) {
+				var onProgress = function(xhr) {
+					if(xhr.lengthComputable) {}
+				};
+				var onError = function(xhr) {};
+				var mtlLoader = new THREE.MTLLoader();
+				mtlLoader.load(mtl, function(materials) {
+
+					materials.preload();
+
+					var objLoader = new THREE.OBJLoader();
+					objLoader.setMaterials(materials);
+					objLoader.load(obj, function(object) {
+
+						object.position.y = y;
+						object.position.x = x;
+						object.position.z = z;
+						object.rotation.y = r;
+						object.name = name
+						
+						//点击事件
+						object.on('click', (m) => {
+							var videoName = m.parent.name;
+							if(videoName != '') {
+								if(video_click[videoName]) {
+									video_remove()
+								} else {
+									video_click[videoName] = true;
+									if(videoScreen != null) {
+										video_remove()
+									}
+									initVideo(videoName)
+									video_start_name = videoName;
+								}
+							}
+						})
+
+						object.scale.set(0.05, 0.05, 0.05);
+						scene.add(object);
+
+					}, onProgress, onError);
+				});
+			}
+
+			// 移除视频
+			function video_remove() {
+				video_click[video_start_name] = false
+				videoScreen.geometry.dispose();
+				videoScreen.material.dispose();
+				scene.remove(videoScreen)
+				videoScreen = null
+				var video = document.getElementById(video_start_name);
+				video.pause()
+				video_start_name = ''
+			}
+
+			function initObject() {
+				createWallMaterail();
+				createFloor();
+				createLayout();
+			}
+
+			// 初始化柜子
+			function initCabinet(flag, x1, x2, x3) {
+				var loader = new THREE.TextureLoader();
+				dummys[flag] = new THREE.Object3D();
+				loader.load("images/gz4.png", function(texture) {
+					var doorgeometry = new THREE.BoxGeometry(400, 200, 2);
+					var doormaterial = new THREE.MeshBasicMaterial({
+						map: texture,
+						color: 0xffffff
+					});
+					doormaterial.opacity = 1.0;
+					doormaterial.transparent = true;
+					cabinets[flag] = new THREE.Mesh(doorgeometry, doormaterial);
+					cabinets[flag].position.set(-50, 0, 0);
+					var door1 = cabinets[flag].clone();
+					door1.position.set(50, 0, 0);
+					door1.visible = false;
+					dummys[flag].add(cabinets[flag]);
+					dummys[flag].add(door1);
+					dummys[flag].position.set(x1, x2, x3)
+					scene.add(dummys[flag]);
+				});
+			}
+
+			//初始化函数 		
+			function init() {
+				initScene();
+				initCamera();
+				initEvent();
+				initRender();
+				initControls();
+				initLight();
+				initObject();
+			}
+
+			// 回车开门
+			function onkeyDown(event) {
+				switch(event.keyCode) {
+					case 13:
+						console.log(event.keyCode);
+						if(door_state) {
+							dummy.rotation.y += 0.5 * Math.PI;
+							door_state = false;
+						} else {
+							dummy.rotation.y -= 0.5 * Math.PI;
+							door_state = true;
+						}
+						break;
+					default:
+						console.log(event.keyCode);
+						break;
+				}
+			}
+
+			function animate() {
+				requestAnimationFrame(animate);
+				renderer.render(scene, camera);
+				update();
+			}
+
+			function update() {
+				controls.update();
+			}
+		</script>
+	</body>
+
+</html>
