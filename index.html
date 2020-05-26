@@ -20,16 +20,16 @@
 
 
 		<div id="ThreeJS" style="position: absolute; left: 0px; top: 0px"></div>
-		<video id="sxt1" loop crossOrigin="anonymous" playsinline style="display:none">
+		<video id="video1" loop crossOrigin="anonymous" playsinline style="display:none">
+			<source src="./video/4.mp4" type='video/mp4; codecs="avc1.42E01E, mp4a.40.2"'>
+		</video>
+		<video id="video2" loop crossOrigin="anonymous" playsinline style="display:none">
 			<source src="./video/5.mp4" type='video/mp4; codecs="avc1.42E01E, mp4a.40.2"'>
 		</video>
-		<video id="sxt2" loop crossOrigin="anonymous" playsinline style="display:none">
-			<source src="./video/5.mp4" type='video/mp4; codecs="avc1.42E01E, mp4a.40.2"'>
+		<video id="video3" loop crossOrigin="anonymous" playsinline style="display:none">
+			<source src="./video/4.mp4" type='video/mp4; codecs="avc1.42E01E, mp4a.40.2"'>
 		</video>
-		<video id="sxt3" loop crossOrigin="anonymous" playsinline style="display:none">
-			<source src="./video/5.mp4" type='video/mp4; codecs="avc1.42E01E, mp4a.40.2"'>
-		</video>
-		<video id="sxt4" loop crossOrigin="anonymous" playsinline style="display:none">
+		<video id="video4" loop crossOrigin="anonymous" playsinline style="display:none">
 			<source src="./video/5.mp4" type='video/mp4; codecs="avc1.42E01E, mp4a.40.2"'>
 		</video>
 
@@ -43,8 +43,6 @@
 			var videoScreen = null;
 			var video_click = {}
 			var video_start_name = "";
-			//事件相关
-			var threeOnEvent;
 			var scene, camera, renderer, controls, door;
 			var SCREEN_WIDTH = window.innerWidth,
 				SCREEN_HEIGHT = window.innerHeight;
@@ -56,6 +54,16 @@
 			var materialArrayB = [];
 			var matArrayA = [];
 			var matArrayB = [];
+			var raycaster = new THREE.Raycaster();
+		    var mouse = new THREE.Vector2();
+		    var click_object = [];
+		    var video_coord = {
+				video1: {x:-605, y:150, z:400, r:0,s: 0.05},
+				video2: {x:605, y:150, z:-400, r:3.14,s: 0.05},
+				video3: {x:605, y:150, z:400, r:3.14,s: 0.05},
+				video4: {x:-605, y:150, z:-400, r:0,s: 0.05},
+				fire1: {x:-620, y:0, z:-420, r:0,s: 0.3}
+			};
 			init();
 			animate();
 
@@ -74,11 +82,6 @@
 				scene.add(camera);
 			}
 
-			// 事件
-			function initEvent() {
-				threeOnEvent = new THREE.onEvent(scene, camera);
-			}
-
 			// 渲染器
 			function initRender() {
 				if(Detector.webgl) {
@@ -93,8 +96,6 @@
 				container = document.getElementById('ThreeJS');
 				container.appendChild(renderer.domElement);
 				renderer.setClearColor(0xEEEEEE, 0.0);
-				//更新事件
-				threeOnEvent.update();
 			}
 
 			// 控制
@@ -312,7 +313,7 @@
 					door1.visible = false;
 					dummy.add(door);
 					dummy.add(door1);
-					dummy.position.set(50, 90, 451)
+					dummy.position.set(50, 90, 451);
 					scene.add(dummy);
 				});
 
@@ -341,18 +342,20 @@
 				glass_material.transparent = true;
 				createCubeWall(10, 100, 200, 0.5, glass_material, 10, 120, 300);
 
-				initWebcam("sxt1", './obj/camera.mtl', './obj/camera_left.obj', -605, 150, 400, 0);
-				initWebcam("sxt2", './obj/camera.mtl', './obj/camera_right.obj', 605, 150, 400, 3.14);
-				initWebcam("sxt3", './obj/camera.mtl', './obj/camera_right.obj', -605, 150, -400, 0);
-				initWebcam("sxt4", './obj/camera.mtl', './obj/camera_left.obj', 605, 150, -400, 3.14);
-
+				initObj("video1", './obj/camera.mtl', './obj/camera_left.obj');
+				initObj("video2", './obj/camera.mtl', './obj/camera_right.obj');
+				initObj("video3", './obj/camera.mtl', './obj/camera_right.obj');
+				initObj("video4", './obj/camera.mtl', './obj/camera_left.obj');
+				// 初始化灭火器
+				initObj("fire1", './obj/fire.mtl', './obj/fire.obj');
 			}
 
 			// 初始化视频
 			function initVideo(videoName) {
+				debugger;
 				var video = document.getElementById(videoName);
-				video.play();
-				texture = new THREE.VideoTexture(video);
+			    video.play();
+			    var texture = new THREE.VideoTexture(video);
 				texture.minFilter = THREE.LinearFilter;
 				var parameters = {
 					color: 0xffffff,
@@ -363,8 +366,8 @@
 				videoScreen = cube;
 			}
 
-			// 初始化摄像头
-			function initWebcam(name, mtl, obj, x, y, z, r) {
+			// 初始化模型
+			function initObj(name, mtl, obj) {
 				var onProgress = function(xhr) {
 					if(xhr.lengthComputable) {}
 				};
@@ -378,30 +381,19 @@
 					objLoader.setMaterials(materials);
 					objLoader.load(obj, function(object) {
 
-						object.position.y = y;
-						object.position.x = x;
-						object.position.z = z;
-						object.rotation.y = r;
+						var v = video_coord[name]
+						object.position.y = v.y;
+						object.position.x = v.x;
+						object.position.z = v.z;
+						object.rotation.y = v.r;
 						object.name = name
 						
-						//点击事件
-						object.on('click', (m) => {
-							var videoName = m.parent.name;
-							if(videoName != '') {
-								if(video_click[videoName]) {
-									video_remove()
-								} else {
-									video_click[videoName] = true;
-									if(videoScreen != null) {
-										video_remove()
-									}
-									initVideo(videoName)
-									video_start_name = videoName;
-								}
-							}
-						})
-
-						object.scale.set(0.05, 0.05, 0.05);
+						for(var i=0; i < object.children.length; i++) {
+							object.children[i].name = name;
+			            	click_object.push(object.children[i]);
+			            }
+						
+						object.scale.set(v.s, v.s, v.s);
 						scene.add(object);
 
 					}, onProgress, onError);
@@ -416,7 +408,9 @@
 				scene.remove(videoScreen)
 				videoScreen = null
 				var video = document.getElementById(video_start_name);
-				video.pause()
+				setTimeout(() => {
+					video.pause();
+				},20)
 				video_start_name = ''
 			}
 
@@ -454,11 +448,14 @@
 			function init() {
 				initScene();
 				initCamera();
-				initEvent();
 				initRender();
 				initControls();
 				initLight();
 				initObject();
+				
+				document.addEventListener("keydown", onkeyDown, false);
+				document.addEventListener("mousedown", clickEvent,false);
+				window.addEventListener("resize", onWindowResize, false);
 			}
 
 			// 回车开门
@@ -488,6 +485,55 @@
 
 			function update() {
 				controls.update();
+			}
+			
+			// 点击事件
+			function clickEvent(event) {
+		        event.preventDefault();
+		        
+		        // 获取当前的div距离左侧和右侧的距离
+		        var dis_top = $('#ThreeJS').offset().top;
+				var dis_left = $('#ThreeJS').offset().left;
+				
+		        // 通过鼠标点击位置,计算出 raycaster 所需点的位置,以屏幕为中心点,范围 -1 到 1
+		        mouse.x = (event.clientX - dis_left) / SCREEN_WIDTH * 2 - 1;
+		        mouse.y = -(event.clientY - dis_top) / SCREEN_HEIGHT * 2 + 1;
+		 
+		        //通过鼠标点击的位置(二维坐标)和当前相机的矩阵计算出射线位置
+		        raycaster.setFromCamera(mouse, camera);
+            
+		        // 获取与射线相交的对象数组，其中的元素按照距离排序，越近的越靠前
+		        var intersects = raycaster.intersectObjects(click_object);
+		        
+		        if (intersects.length > 0) {
+					addEvent(intersects[0].object)
+					return;
+				}
+		   	}
+			
+			function addEvent(object) {
+				var videoName = object.name;
+			    if(videoName.indexOf("video") != -1) {
+		      		if(video_click[videoName]) {
+		      			video_remove()
+		      		} else {
+		      			video_click[videoName] = true;
+		      			if (videoScreen != null) {
+			      			video_remove()
+			      		}
+			      		initVideo(videoName)
+			      		video_start_name = videoName;
+		      		}
+		      	}
+			}
+			
+			// 窗口改变事件
+			function onWindowResize(){
+				SCREEN_WIDTH = $('#ThreeJS').width();
+				SCREEN_HEIGHT = $('#ThreeJS').height();
+				camera.aspect = SCREEN_WIDTH / SCREEN_HEIGHT;
+				camera.updateProjectionMatrix();
+				renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
 			}
 		</script>
 	</body>
