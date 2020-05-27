@@ -206,26 +206,6 @@
 				scene.add(cube);
 				return cube;
 			}
-			
-			// 创建地板
-			function createFloor() {
-				var loader = new THREE.TextureLoader();
-				loader.load("images/floor.jpg", function(texture) {
-					texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-					texture.repeat.set(10, 10);
-					var floorGeometry = new THREE.BoxGeometry(1600, 1100, 1);
-					var floorMaterial = new THREE.MeshBasicMaterial({
-						map: texture,
-						side: THREE.DoubleSide
-					});
-					var floor = new THREE.Mesh(floorGeometry, floorMaterial);
-					floor.position.y = -0.5;
-					floor.rotation.x = Math.PI / 2;
-					scene.add(floor);
-				});
-
-				weiqiang()
-			}
 
 			//返回墙对象
 			function returnWallObject(width, height, depth, angle, material, x, y, z) {
