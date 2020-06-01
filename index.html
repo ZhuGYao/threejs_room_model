@@ -332,7 +332,6 @@
 
 			// 初始化视频
 			function initVideo(videoName) {
-				debugger;
 				var video = document.getElementById(videoName);
 			    video.play();
 			    var texture = new THREE.VideoTexture(video);
@@ -442,7 +441,6 @@
 			function onkeyDown(event) {
 				switch(event.keyCode) {
 					case 13:
-						console.log(event.keyCode);
 						if(door_state) {
 							dummy.rotation.y += 0.5 * Math.PI;
 							door_state = false;
@@ -452,7 +450,6 @@
 						}
 						break;
 					default:
-						console.log(event.keyCode);
 						break;
 				}
 			}
